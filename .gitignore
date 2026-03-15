@@ -6,6 +6,18 @@ token.json
 # 임시 파일
 .tmp/
 
+# Flutter 빌드 캐시
+build/
+.dart_tool/
+*.iml
+*.ipr
+*.iws
+.idea/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+pubspec.lock
+
 # macOS
 .DS_Store
 
