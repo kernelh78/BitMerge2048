@@ -24,7 +24,7 @@ class AudioService {
     // 플레이어 초기화 — lowLatency는 BytesSource 미지원이므로 기본 모드 사용
     for (final event in SoundEvent.values) {
       final p = AudioPlayer();
-      await p.setVolume(0.7);
+      await p.setVolume(1.0);
       _players[event] = p;
     }
 
@@ -73,36 +73,45 @@ class AudioService {
   // ─────────────────────────────────────
 
   static List<double> _slideWave() {
-    final n = (_sr * 0.055).round();
+    // 경쾌한 "틱-슉" 효과: 짧은 클릭 + 주파수 스윕
+    final n = (_sr * 0.075).round();
+    final rng = Random(7);
     return List.generate(n, (i) {
       final t = i / _sr;
-      final freq = 520.0 * exp(-t * 14);
-      final env = (1.0 - i / n) * 0.25;
-      return sin(2 * pi * freq * t) * env;
+      // 앞부분 노이즈 클릭
+      final click = (rng.nextDouble() * 2 - 1) * exp(-t * 180) * 0.55;
+      // 주파수 스윕: 700Hz → 220Hz
+      final freq = 700.0 * exp(-t * 12);
+      final sweep = sin(2 * pi * freq * t) * exp(-t * 20) * 0.45;
+      return (click + sweep).clamp(-1.0, 1.0);
     });
   }
 
   static List<double> _mergeWave() {
-    final n = (_sr * 0.11).round();
+    // 강력한 전자 "팡!" 사운드
+    final n = (_sr * 0.22).round();
     final rng = Random(42);
     return List.generate(n, (i) {
       final t = i / _sr;
-      final freq = 180.0 + 700.0 * exp(-t * 20);
-      final harmonics = sin(2 * pi * freq * t)
-          + sin(4 * pi * freq * t) * 0.45
-          + sin(6 * pi * freq * t) * 0.2;
-      final noise = (rng.nextDouble() * 2 - 1) * 0.15;
-      final env = exp(-t * 14) * 0.55;
-      return (harmonics + noise) * env;
+      // 임팩트 노이즈 어택 (처음 10ms)
+      final attack = (rng.nextDouble() * 2 - 1) * exp(-t * 90) * 0.6;
+      // 풍부한 하모닉 스윕
+      final freq = 260.0 + 1400.0 * exp(-t * 28);
+      final h1 = sin(2 * pi * freq * t);
+      final h2 = sin(4 * pi * freq * t) * 0.55;
+      final h3 = sin(6 * pi * freq * t) * 0.28;
+      final h4 = sin(8 * pi * freq * t) * 0.12;
+      final harmonics = (h1 + h2 + h3 + h4) * exp(-t * 11) * 0.85;
+      return (attack + harmonics).clamp(-1.0, 1.0);
     });
   }
 
   static List<double> _spawnWave() {
-    final n = (_sr * 0.025).round();
+    final n = (_sr * 0.030).round();
     return List.generate(n, (i) {
       final t = i / _sr;
-      final env = exp(-t * 60) * 0.2;
-      return sin(2 * pi * 1100.0 * t) * env;
+      final env = exp(-t * 55) * 0.32;
+      return sin(2 * pi * 1200.0 * t) * env;
     });
   }
 

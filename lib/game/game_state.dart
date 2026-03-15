@@ -20,6 +20,16 @@ class TileData {
     this.isMerged = false,
   }) : id = '${DateTime.now().microsecondsSinceEpoch}_${Random().nextInt(9999)}';
 
+  // ID를 보존하는 내부 생성자 (슬라이드 이동 시 사용)
+  TileData._withId({
+    required this.id,
+    required this.value,
+    required this.row,
+    required this.col,
+    this.isNew = false,
+    this.isMerged = false,
+  });
+
   TileData copyWith({
     int? value,
     int? row,
@@ -27,7 +37,8 @@ class TileData {
     bool? isNew,
     bool? isMerged,
   }) {
-    return TileData(
+    return TileData._withId(
+      id: id, // ID 보존
       value: value ?? this.value,
       row: row ?? this.row,
       col: col ?? this.col,
@@ -103,9 +114,15 @@ class GameState {
   GameState swipe(SwipeDirection direction) {
     if (status != GameStatus.playing) return this;
 
+    // 현재 타일의 위치→ID 맵 (슬라이드 시 ID 보존용)
+    final Map<(int, int), String> posToId = {
+      for (final t in tiles) (t.row, t.col): t.id,
+    };
+
     final newBoard = _copyBoard();
     int addedScore = 0;
     final newMergedTiles = <TileData>[];
+    final Map<(int, int), String> slideIds = {}; // 새 위치 → 기존 ID
 
     switch (direction) {
       case SwipeDirection.left:
@@ -115,12 +132,12 @@ class GameState {
           addedScore += result.score;
           for (final tile in result.mergedPositions) {
             newMergedTiles.add(TileData(
-              value: tile.$1,
-              row: r,
-              col: tile.$2,
-              isNew: false,
-              isMerged: true,
+              value: tile.$1, row: r, col: tile.$2, isNew: false, isMerged: true,
             ));
+          }
+          for (final (origIdx, newIdx) in result.moves) {
+            final id = posToId[(r, origIdx)];
+            if (id != null) slideIds[(r, newIdx)] = id;
           }
         }
       case SwipeDirection.right:
@@ -131,12 +148,12 @@ class GameState {
           addedScore += result.score;
           for (final tile in result.mergedPositions) {
             newMergedTiles.add(TileData(
-              value: tile.$1,
-              row: r,
-              col: 3 - tile.$2,
-              isNew: false,
-              isMerged: true,
+              value: tile.$1, row: r, col: 3 - tile.$2, isNew: false, isMerged: true,
             ));
+          }
+          for (final (origIdx, newIdx) in result.moves) {
+            final id = posToId[(r, 3 - origIdx)];
+            if (id != null) slideIds[(r, 3 - newIdx)] = id;
           }
         }
       case SwipeDirection.up:
@@ -149,12 +166,12 @@ class GameState {
           addedScore += result.score;
           for (final tile in result.mergedPositions) {
             newMergedTiles.add(TileData(
-              value: tile.$1,
-              row: tile.$2,
-              col: c,
-              isNew: false,
-              isMerged: true,
+              value: tile.$1, row: tile.$2, col: c, isNew: false, isMerged: true,
             ));
+          }
+          for (final (origIdx, newIdx) in result.moves) {
+            final id = posToId[(origIdx, c)];
+            if (id != null) slideIds[(newIdx, c)] = id;
           }
         }
       case SwipeDirection.down:
@@ -167,12 +184,12 @@ class GameState {
           addedScore += result.score;
           for (final tile in result.mergedPositions) {
             newMergedTiles.add(TileData(
-              value: tile.$1,
-              row: 3 - tile.$2,
-              col: c,
-              isNew: false,
-              isMerged: true,
+              value: tile.$1, row: 3 - tile.$2, col: c, isNew: false, isMerged: true,
             ));
+          }
+          for (final (origIdx, newIdx) in result.moves) {
+            final id = posToId[(3 - origIdx, c)];
+            if (id != null) slideIds[(3 - newIdx, c)] = id;
           }
         }
     }
@@ -193,12 +210,25 @@ class GameState {
     final newScore = score + addedScore;
     final newBest = max(bestScore, newScore);
 
-    // 타일 리스트 재구성
+    // ID를 보존하며 타일 리스트 재구성
     final newTiles = <TileData>[];
+    newTiles.addAll(newMergedTiles); // 머지된 타일 (새 ID)
+
+    final mergedPositionSet = {for (final t in newMergedTiles) (t.row, t.col)};
     for (int r = 0; r < 4; r++) {
       for (int c = 0; c < 4; c++) {
-        if (newBoard[r][c] != 0) {
-          newTiles.add(TileData(value: newBoard[r][c], row: r, col: c, isNew: false));
+        if (newBoard[r][c] != 0 && !mergedPositionSet.contains((r, c))) {
+          final preservedId = slideIds[(r, c)];
+          if (preservedId != null) {
+            newTiles.add(TileData._withId(
+              id: preservedId,
+              value: newBoard[r][c],
+              row: r,
+              col: c,
+            ));
+          } else {
+            newTiles.add(TileData(value: newBoard[r][c], row: r, col: c, isNew: false));
+          }
         }
       }
     }
@@ -221,7 +251,7 @@ class GameState {
     }
 
     if (won) {
-      next = GameState(
+      return GameState(
         board: next.board,
         score: next.score,
         bestScore: next.bestScore,
@@ -229,7 +259,6 @@ class GameState {
         tiles: next.tiles,
         mergedTiles: next.mergedTiles,
       );
-      return next;
     }
 
     next = next._spawnTile();
@@ -250,29 +279,42 @@ class GameState {
   }
 
   _MergeResult _mergeLine(List<int> line) {
-    final packed = line.where((v) => v != 0).toList();
+    // 원래 인덱스 추적
+    final indexedPacked = <(int, int)>[]; // (origIdx, value)
+    for (int i = 0; i < line.length; i++) {
+      if (line[i] != 0) indexedPacked.add((i, line[i]));
+    }
+
     final result = List.filled(4, 0);
     int score = 0;
     int pos = 0;
     final mergedPositions = <(int, int)>[];
+    final moves = <(int, int)>[]; // (origIdx, newIdx) — 머지되지 않고 이동한 타일
     int i = 0;
 
-    while (i < packed.length) {
-      if (i + 1 < packed.length && packed[i] == packed[i + 1]) {
-        final merged = packed[i] * 2;
+    while (i < indexedPacked.length) {
+      if (i + 1 < indexedPacked.length &&
+          indexedPacked[i].$2 == indexedPacked[i + 1].$2) {
+        final merged = indexedPacked[i].$2 * 2;
         result[pos] = merged;
         score += merged;
         mergedPositions.add((merged, pos));
         pos++;
         i += 2;
       } else {
-        result[pos] = packed[i];
+        result[pos] = indexedPacked[i].$2;
+        moves.add((indexedPacked[i].$1, pos));
         pos++;
         i++;
       }
     }
 
-    return _MergeResult(merged: result, score: score, mergedPositions: mergedPositions);
+    return _MergeResult(
+      merged: result,
+      score: score,
+      mergedPositions: mergedPositions,
+      moves: moves,
+    );
   }
 
   bool _canMove() {
@@ -306,6 +348,12 @@ class _MergeResult {
   final List<int> merged;
   final int score;
   final List<(int, int)> mergedPositions;
+  final List<(int, int)> moves; // (origIdx, newIdx) for non-merged tiles
 
-  _MergeResult({required this.merged, required this.score, required this.mergedPositions});
+  _MergeResult({
+    required this.merged,
+    required this.score,
+    required this.mergedPositions,
+    required this.moves,
+  });
 }

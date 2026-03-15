@@ -67,45 +67,24 @@ class GameBoard extends StatelessWidget {
   }
 
   List<Widget> _buildTiles(double cellSize) {
-    final tiles = <Widget>[];
+    return state.tiles.map((tile) {
+      final top = tile.row * cellSize + 6;
+      final left = tile.col * cellSize + 6;
 
-    for (int r = 0; r < 4; r++) {
-      for (int c = 0; c < 4; c++) {
-        final value = state.board[r][c];
-        if (value == 0) continue;
-
-        // 머지된 타일인지 확인
-        final isMerged = state.mergedTiles.any(
-          (t) => t.row == r && t.col == c && t.value == value,
-        );
-
-        // 새 타일인지 확인
-        final isNew = state.tiles.any(
-          (t) => t.row == r && t.col == c && t.isNew,
-        );
-
-        final top = r * cellSize + 6;
-        final left = c * cellSize + 6;
-
-        tiles.add(
-          AnimatedPositioned(
-            key: ValueKey('tile_${r}_${c}_$value'),
-            duration: const Duration(milliseconds: 120),
-            curve: Curves.easeOut,
-            top: top,
-            left: left,
-            width: cellSize,
-            height: cellSize,
-            child: SparkTile(
-              value: value,
-              isNew: isNew,
-              isMerged: isMerged,
-            ),
-          ),
-        );
-      }
-    }
-
-    return tiles;
+      return AnimatedPositioned(
+        key: ValueKey(tile.id), // ID 기반 키: 같은 타일이면 Flutter가 위치 변화를 감지해 애니메이션
+        duration: const Duration(milliseconds: 130),
+        curve: Curves.easeOutCubic,
+        top: top,
+        left: left,
+        width: cellSize,
+        height: cellSize,
+        child: SparkTile(
+          value: tile.value,
+          isNew: tile.isNew,
+          isMerged: tile.isMerged,
+        ),
+      );
+    }).toList();
   }
 }

@@ -25,21 +25,32 @@ class _SparkTileState extends State<SparkTile>
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 180),
-    );
 
     if (widget.isNew) {
+      _controller = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 220),
+      );
       _scaleAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
         CurvedAnimation(parent: _controller, curve: Curves.elasticOut),
       );
     } else if (widget.isMerged) {
+      _controller = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 300),
+      );
+      // 쾌감 있는 팝: 크게 튀었다가 살짝 눌렸다 안정
       _scaleAnim = TweenSequence<double>([
-        TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.25), weight: 40),
-        TweenSequenceItem(tween: Tween(begin: 1.25, end: 1.0), weight: 60),
+        TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.45), weight: 30),
+        TweenSequenceItem(tween: Tween(begin: 1.45, end: 0.88), weight: 30),
+        TweenSequenceItem(tween: Tween(begin: 0.88, end: 1.04), weight: 20),
+        TweenSequenceItem(tween: Tween(begin: 1.04, end: 1.0), weight: 20),
       ]).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
     } else {
+      _controller = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 180),
+      );
       _scaleAnim = ConstantTween<double>(1.0).animate(_controller);
     }
 
@@ -50,6 +61,13 @@ class _SparkTileState extends State<SparkTile>
   void didUpdateWidget(SparkTile old) {
     super.didUpdateWidget(old);
     if (widget.isMerged && !old.isMerged) {
+      _controller.duration = const Duration(milliseconds: 300);
+      _scaleAnim = TweenSequence<double>([
+        TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.45), weight: 30),
+        TweenSequenceItem(tween: Tween(begin: 1.45, end: 0.88), weight: 30),
+        TweenSequenceItem(tween: Tween(begin: 0.88, end: 1.04), weight: 20),
+        TweenSequenceItem(tween: Tween(begin: 1.04, end: 1.0), weight: 20),
+      ]).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
       _controller.forward(from: 0);
     }
   }

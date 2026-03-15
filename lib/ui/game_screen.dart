@@ -77,51 +77,51 @@ class _GameScreenState extends State<GameScreen> {
     return Scaffold(
       backgroundColor: SparkTheme.background,
       body: SafeArea(
-        child: Stack(
-          children: [
-            // 전체 화면 스와이프 감지 레이어
-            Positioned.fill(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onPanStart: (d) {
-                  _panStart = d.localPosition;
-                  _panCurrent = d.localPosition;
-                },
-                onPanUpdate: (d) {
-                  _panCurrent = d.localPosition;
-                },
-                onPanEnd: (d) {
-                  final start = _panStart;
-                  if (start == null) return;
-                  _panStart = null;
+        // GestureDetector가 Stack 전체를 감싸야 버튼 위에서도 스와이프가 누락되지 않음
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onPanStart: (d) {
+            _panStart = d.localPosition;
+            _panCurrent = d.localPosition;
+          },
+          onPanUpdate: (d) {
+            _panCurrent = d.localPosition;
+          },
+          onPanEnd: (d) {
+            final start = _panStart;
+            if (start == null) return;
+            _panStart = null;
 
-                  final delta = _panCurrent - start;
-                  final dx = delta.dx;
-                  final dy = delta.dy;
+            final delta = _panCurrent - start;
+            final vel = d.velocity.pixelsPerSecond;
 
-                  if (dx.abs() < _minSwipeDist && dy.abs() < _minSwipeDist) return;
+            // 델타가 작을 경우 속도로 보완 (빠른 플릭 누락 방지)
+            final dx = delta.dx.abs() > 6 ? delta.dx : vel.dx / 22;
+            final dy = delta.dy.abs() > 6 ? delta.dy : vel.dy / 22;
 
-                  if (dx.abs() > dy.abs()) {
-                    _onSwipe(dx > 0 ? SwipeDirection.right : SwipeDirection.left);
-                  } else {
-                    _onSwipe(dy > 0 ? SwipeDirection.down : SwipeDirection.up);
-                  }
-                },
-              ),
-            ),
-            // UI 콘텐츠 (터치 이벤트를 막지 않음)
-            _buildMainContent(boardSize),
-            if (_state.status == GameStatus.won)
-              SparkIgnitedOverlay(
-                onContinue: _continueGame,
-                onRestart: _restart,
-              ),
-            if (_state.status == GameStatus.over)
-              GameOverOverlay(
-                score: _state.score,
-                onRestart: _restart,
-              ),
-          ],
+            if (dx.abs() < _minSwipeDist && dy.abs() < _minSwipeDist) return;
+
+            if (dx.abs() > dy.abs()) {
+              _onSwipe(dx > 0 ? SwipeDirection.right : SwipeDirection.left);
+            } else {
+              _onSwipe(dy > 0 ? SwipeDirection.down : SwipeDirection.up);
+            }
+          },
+          child: Stack(
+            children: [
+              _buildMainContent(boardSize),
+              if (_state.status == GameStatus.won)
+                SparkIgnitedOverlay(
+                  onContinue: _continueGame,
+                  onRestart: _restart,
+                ),
+              if (_state.status == GameStatus.over)
+                GameOverOverlay(
+                  score: _state.score,
+                  onRestart: _restart,
+                ),
+            ],
+          ),
         ),
       ),
     );
