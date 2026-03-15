@@ -1,0 +1,17 @@
+# 민감 정보
+.env
+credentials.json
+token.json
+
+# 임시 파일
+.tmp/
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
