@@ -1,7 +1,7 @@
 # BitMerge: 2048 Spark — 개발 리포트 v0.1
 
-> 최초 작성: 2026-03-15 / 최종 업데이트: 2026-03-15
-> 버전: 0.1.0+1
+> 최초 작성: 2026-03-15 / 최종 업데이트: 2026-03-17
+> 버전: 1.0.0+1
 > 플랫폼: Android (primary), iOS/iPadOS (지원 예정)
 > Bundle ID: `com.spark.bitmerge2048`
 
@@ -35,6 +35,7 @@ Flutter로 개발하여 Android·iOS·iPadOS 단일 코드베이스에서 동작
 - [x] 2048 달성 감지 → 승리 오버레이
 - [x] 계속하기 (2048 이후 계속 플레이)
 - [x] 현재 점수 / 최고 점수 추적
+- [x] 최고 점수 영구 저장 (앱 재시작 후에도 유지)
 
 ### 2.2 UI / UX
 
@@ -42,8 +43,8 @@ Flutter로 개발하여 Android·iOS·iPadOS 단일 코드베이스에서 동작
 - [x] 타일 값별 네온 색상 시스템 (2 ~ 2048+)
 - [x] 회로기판 패턴 오버레이 (CustomPainter)
 - [x] 타일 팝업 애니메이션 (새 타일: elastic scale, 220ms)
-- [x] 타일 합치기 임팩트 애니메이션 (1.0→1.45→0.88→1.04→1.0 바운스, 300ms)
-- [x] 타일 슬라이드 애니메이션 (ID 기반 위치 추적, easeOutCubic 130ms)
+- [x] 타일 합치기 임팩트 애니메이션 (1.0→1.65→0.82→1.10→1.0 강화 바운스, 260ms)
+- [x] 타일 슬라이드 애니메이션 (ID 기반 위치 추적, 지수 감속(ExpoOut) 150ms)
 - [x] 점수 증가 플로팅 텍스트 (+N 표시)
 - [x] 헤더: 로고 + 타이틀 + 음소거 버튼 + 새 게임 버튼
 - [x] 새 게임 버튼 누를 때 360도 회전 피드백
@@ -71,6 +72,7 @@ Flutter로 개발하여 Android·iOS·iPadOS 단일 코드베이스에서 동작
 | 프레임워크 | Flutter 3.41.4 / Dart 3.11.1 |
 | 렌더링 | Impeller (Vulkan) |
 | 사운드 | audioplayers 6.6.0 |
+| 저장 | shared_preferences 2.3.0 |
 | 최소 SDK | Android API minSdk (Flutter 기본값) |
 | 타겟 SDK | Android API 36 (Android 16) |
 
@@ -81,7 +83,8 @@ lib/
 ├── main.dart
 ├── game/
 │   ├── game_state.dart      # 게임 로직 (이동, 합치기, 승패 판정)
-│   └── audio_service.dart   # 사운드 합성 및 재생
+│   ├── audio_service.dart   # 사운드 합성 및 재생
+│   └── score_storage.dart   # 최고 점수 영구 저장 (SharedPreferences)
 ├── theme/
 │   └── spark_theme.dart     # 다크 테마 + 네온 색상 시스템
 └── ui/
@@ -98,9 +101,10 @@ lib/
 
 | 이슈 | 상태 | 비고 |
 |------|------|------|
-| 점수 영구 저장 없음 | 미구현 | 앱 재시작 시 Best Score 초기화 |
+| 점수 영구 저장 없음 | ✅ 해결 | SharedPreferences로 기기에 저장, 앱 재시작 후에도 유지 |
 | iOS 빌드 미테스트 | 미완 | 코드는 준비됨, 실기기 테스트 필요 |
 | 타일 이동 슬라이드 애니메이션 | ✅ 해결 | 타일 ID 보존으로 AnimatedPositioned 정상 작동 |
+| 사운드 재생 딜레이 | ✅ 개선 | stop() 대기 제거, 직접 play() 호출로 응답 속도 향상 |
 
 ---
 
@@ -108,14 +112,14 @@ lib/
 
 ### 4.1 우선순위 높음
 
-- [ ] **점수 영구 저장** — SharedPreferences로 Best Score 앱 재시작 후에도 유지
+- [x] ~~**점수 영구 저장**~~ — 완료 (2026-03-17)
 - [x] ~~**타일 이동 애니메이션 개선**~~ — 완료 (2026-03-15)
+- [x] ~~**햅틱 피드백 세분화**~~ — 완료 (2026-03-17)
 - [ ] **iOS / iPadOS 실기기 테스트 및 앱 아이콘 설정**
 - [ ] **앱 아이콘** — Spark 컨셉에 맞는 커스텀 아이콘 제작
 
 ### 4.2 우선순위 중간
 
-- [ ] **햅틱 피드백 세분화** — 합치기/이동/승리별 다른 패턴
 - [ ] **애니메이션 폴리싱** — 머지 시 스파크 파티클 (보드 내)
 - [ ] **게임 통계** — 총 플레이 횟수, 최고 달성 타일, 플레이 시간
 - [ ] **다크/라이트 테마 전환** — 현재 다크 고정
@@ -130,6 +134,27 @@ lib/
 ---
 
 ## 5. 변경 이력
+
+### 2026-03-17 — 최고기록 영구 저장 · 애니메이션 강화 · 햅틱 세분화 · 사운드 딜레이 개선
+
+#### 변경 내용
+
+| 파일 | 변경 |
+|------|------|
+| `pubspec.yaml` | `shared_preferences ^2.3.0` 추가 |
+| `game/score_storage.dart` | 신규 — SharedPreferences 기반 최고기록 저장/로드 |
+| `ui/game_screen.dart` | 앱 시작 시 저장된 최고기록 로드, 갱신 시 자동 저장 |
+| `ui/game_screen.dart` | 햅틱 5단계 세분화: 슬라이드(selectionClick) / 소합체(light+click) / 중합체(medium) / 대합체(heavy+medium) / 승리(heavy×3) / 게임오버(heavy+medium) |
+| `ui/game_board.dart` | 슬라이드 커브 `easeOutCubic 130ms` → 지수 감속(ExpoOut) `150ms` — 타일이 빠르게 출발 후 정확히 감속 |
+| `ui/spark_tile.dart` | 합체 팝 스케일 1.45→**1.65**, 압축 0.88→**0.82**, 300ms→**260ms** — 더 강한 팡 느낌 |
+| `game/audio_service.dart` | `stop().then(play)` 체인 제거 → 직접 `play()` 호출로 재생 딜레이 감소 |
+
+#### 테스트
+- 기기: Samsung SM S938N (Android 16 / API 36)
+- 빌드: `flutter build apk --release`
+- 결과: 빌드 성공, 기기 설치 및 실행 확인
+
+---
 
 ### 2026-03-15 — 애니메이션·사운드·입력 개선
 

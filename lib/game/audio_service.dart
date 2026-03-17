@@ -21,31 +21,26 @@ class AudioService {
   void toggleMute() => _muted = !_muted;
 
   Future<void> init() async {
-    // 플레이어 초기화 — lowLatency는 BytesSource 미지원이므로 기본 모드 사용
-    for (final event in SoundEvent.values) {
+    // WAV 생성 (Isolate — 메인 스레드 차단 없음)
+    final wavList = await Isolate.run(_generateAllWavs);
+    final events = SoundEvent.values;
+    for (int i = 0; i < events.length; i++) {
       final p = AudioPlayer();
       await p.setVolume(1.0);
-      _players[event] = p;
+      _players[events[i]] = p;
+      _cache[events[i]] = wavList[i];
     }
-
-    // WAV 생성은 별도 Isolate에서 — 메인 스레드 차단 없음
-    final wavList = await Isolate.run(_generateAllWavs);
-    _cache[SoundEvent.slide] = wavList[0];
-    _cache[SoundEvent.merge] = wavList[1];
-    _cache[SoundEvent.spawn] = wavList[2];
-    _cache[SoundEvent.win]   = wavList[3];
-    _cache[SoundEvent.over]  = wavList[4];
     _ready = true;
   }
 
-  /// fire-and-forget: 사운드 재생이 UI 스레드를 절대 막지 않음
+  /// stop() 없이 바로 play — 이전 stop() 대기가 없어 딜레이 최소화
   void play(SoundEvent event) {
     if (!_ready || _muted) return;
     final bytes = _cache[event];
     final player = _players[event];
     if (bytes == null || player == null) return;
 
-    player.stop().then((_) => player.play(BytesSource(bytes))).ignore();
+    player.play(BytesSource(bytes)).ignore();
   }
 
   Future<void> dispose() async {

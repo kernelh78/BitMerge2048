@@ -37,14 +37,14 @@ class _SparkTileState extends State<SparkTile>
     } else if (widget.isMerged) {
       _controller = AnimationController(
         vsync: this,
-        duration: const Duration(milliseconds: 300),
+        duration: const Duration(milliseconds: 260),
       );
-      // 쾌감 있는 팝: 크게 튀었다가 살짝 눌렸다 안정
+      // 강렬한 팝: 크게 튀었다가 단단하게 눌렸다 빠르게 안정
       _scaleAnim = TweenSequence<double>([
-        TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.45), weight: 30),
-        TweenSequenceItem(tween: Tween(begin: 1.45, end: 0.88), weight: 30),
-        TweenSequenceItem(tween: Tween(begin: 0.88, end: 1.04), weight: 20),
-        TweenSequenceItem(tween: Tween(begin: 1.04, end: 1.0), weight: 20),
+        TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.65), weight: 22),
+        TweenSequenceItem(tween: Tween(begin: 1.65, end: 0.82), weight: 28),
+        TweenSequenceItem(tween: Tween(begin: 0.82, end: 1.10), weight: 28),
+        TweenSequenceItem(tween: Tween(begin: 1.10, end: 1.0), weight: 22),
       ]).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
     } else {
       _controller = AnimationController(

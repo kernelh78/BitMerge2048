@@ -1,7 +1,19 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import '../game/game_state.dart';
 import '../theme/spark_theme.dart';
 import 'spark_tile.dart';
+
+/// 지수 감속 커브: 타일이 빠르게 출발해 정확하게 멈추는 느낌
+class _ExpoOut extends Curve {
+  const _ExpoOut();
+  @override
+  double transformInternal(double t) {
+    if (t == 1.0) return 1.0;
+    return 1 - pow(2, -10 * t).toDouble();
+  }
+}
 
 class GameBoard extends StatelessWidget {
   final GameState state;
@@ -73,8 +85,8 @@ class GameBoard extends StatelessWidget {
 
       return AnimatedPositioned(
         key: ValueKey(tile.id), // ID 기반 키: 같은 타일이면 Flutter가 위치 변화를 감지해 애니메이션
-        duration: const Duration(milliseconds: 130),
-        curve: Curves.easeOutCubic,
+        duration: const Duration(milliseconds: 150),
+        curve: const _ExpoOut(),
         top: top,
         left: left,
         width: cellSize,

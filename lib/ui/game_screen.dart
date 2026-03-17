@@ -1,7 +1,10 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../game/game_state.dart';
 import '../game/audio_service.dart';
+import '../game/score_storage.dart';
 import '../theme/spark_theme.dart';
 import 'game_board.dart';
 import 'score_board.dart';
@@ -28,6 +31,14 @@ class _GameScreenState extends State<GameScreen> {
   void initState() {
     super.initState();
     _audio.init();
+    _loadBestScore();
+  }
+
+  Future<void> _loadBestScore() async {
+    final best = await ScoreStorage.loadBest();
+    if (mounted) {
+      setState(() => _state = GameState.initial(best));
+    }
   }
 
   @override
@@ -44,7 +55,11 @@ class _GameScreenState extends State<GameScreen> {
     if (identical(prev, next)) return;
 
     setState(() => _state = next);
-    HapticFeedback.lightImpact();
+    _triggerHaptic(next);
+
+    if (next.bestScore > prev.bestScore) {
+      ScoreStorage.saveBest(next.bestScore);
+    }
 
     // 사운드 (fire-and-forget, UI 블로킹 없음)
     if (next.status == GameStatus.won) {
@@ -58,6 +73,36 @@ class _GameScreenState extends State<GameScreen> {
       Future.delayed(const Duration(milliseconds: 55), () {
         _audio.play(SoundEvent.spawn);
       });
+    }
+  }
+
+  void _triggerHaptic(GameState next) {
+    if (next.status == GameStatus.won) {
+      // 승리: 강하게 세 번 연타
+      HapticFeedback.heavyImpact();
+      Future.delayed(const Duration(milliseconds: 110), HapticFeedback.heavyImpact);
+      Future.delayed(const Duration(milliseconds: 220), HapticFeedback.heavyImpact);
+    } else if (next.status == GameStatus.over) {
+      // 게임 오버: 강하게 → 중간으로 끝맺음
+      HapticFeedback.heavyImpact();
+      Future.delayed(const Duration(milliseconds: 160), HapticFeedback.mediumImpact);
+    } else if (next.mergedTiles.isNotEmpty) {
+      final maxVal = next.mergedTiles.map((t) => t.value).reduce(max);
+      if (maxVal >= 1024) {
+        // 대합체: 강하게 → 중간 더블펀치
+        HapticFeedback.heavyImpact();
+        Future.delayed(const Duration(milliseconds: 90), HapticFeedback.mediumImpact);
+      } else if (maxVal >= 128) {
+        // 중합체: 묵직한 한 방
+        HapticFeedback.mediumImpact();
+      } else {
+        // 소합체: 가벼운 클릭 + 잔진동
+        HapticFeedback.lightImpact();
+        Future.delayed(const Duration(milliseconds: 70), HapticFeedback.selectionClick);
+      }
+    } else {
+      // 슬라이드만: 선명한 클릭감
+      HapticFeedback.selectionClick();
     }
   }
 
