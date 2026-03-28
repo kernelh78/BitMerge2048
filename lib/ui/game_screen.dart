@@ -5,7 +5,8 @@ import 'package:flutter/services.dart';
 import '../game/game_state.dart';
 import '../game/audio_service.dart';
 import '../game/score_storage.dart';
-import '../theme/spark_theme.dart';
+import '../theme/app_theme.dart';
+import '../theme/theme_notifier.dart';
 import 'game_board.dart';
 import 'score_board.dart';
 import 'overlay_screen.dart';
@@ -22,10 +23,9 @@ class _GameScreenState extends State<GameScreen> {
   final _audio = AudioService();
   bool _muted = false;
 
-  // 스와이프: 위치 델타 기반 (속도 기반보다 훨씬 안정적)
   Offset? _panStart;
   Offset _panCurrent = Offset.zero;
-  static const double _minSwipeDist = 18.0; // 화면 픽셀
+  static const double _minSwipeDist = 18.0;
 
   @override
   void initState() {
@@ -50,8 +50,6 @@ class _GameScreenState extends State<GameScreen> {
   void _onSwipe(SwipeDirection dir) {
     final prev = _state;
     final next = prev.swipe(dir);
-
-    // 변화 없으면 무시
     if (identical(prev, next)) return;
 
     setState(() => _state = next);
@@ -61,7 +59,6 @@ class _GameScreenState extends State<GameScreen> {
       ScoreStorage.saveBest(next.bestScore);
     }
 
-    // 사운드 (fire-and-forget, UI 블로킹 없음)
     if (next.status == GameStatus.won) {
       _audio.play(SoundEvent.win);
     } else if (next.status == GameStatus.over) {
@@ -78,60 +75,47 @@ class _GameScreenState extends State<GameScreen> {
 
   void _triggerHaptic(GameState next) {
     if (next.status == GameStatus.won) {
-      // 승리: 강하게 세 번 연타
       HapticFeedback.heavyImpact();
       Future.delayed(const Duration(milliseconds: 110), HapticFeedback.heavyImpact);
       Future.delayed(const Duration(milliseconds: 220), HapticFeedback.heavyImpact);
     } else if (next.status == GameStatus.over) {
-      // 게임 오버: 강하게 → 중간으로 끝맺음
       HapticFeedback.heavyImpact();
       Future.delayed(const Duration(milliseconds: 160), HapticFeedback.mediumImpact);
     } else if (next.mergedTiles.isNotEmpty) {
       final maxVal = next.mergedTiles.map((t) => t.value).reduce(max);
       if (maxVal >= 1024) {
-        // 대합체: 강하게 → 중간 더블펀치
         HapticFeedback.heavyImpact();
         Future.delayed(const Duration(milliseconds: 90), HapticFeedback.mediumImpact);
       } else if (maxVal >= 128) {
-        // 중합체: 묵직한 한 방
         HapticFeedback.mediumImpact();
       } else {
-        // 소합체: 가벼운 클릭 + 잔진동
         HapticFeedback.lightImpact();
         Future.delayed(const Duration(milliseconds: 70), HapticFeedback.selectionClick);
       }
     } else {
-      // 슬라이드만: 선명한 클릭감
       HapticFeedback.selectionClick();
     }
   }
 
-  void _restart() {
-    setState(() => _state = _state.restart(_state.bestScore));
-  }
-
-  void _continueGame() {
-    setState(() => _state = _state.continueGame());
-  }
+  void _restart() => setState(() => _state = _state.restart(_state.bestScore));
+  void _continueGame() => setState(() => _state = _state.continueGame());
 
   @override
   Widget build(BuildContext context) {
+    final theme = ThemeScope.of(context);
     final screenWidth = MediaQuery.of(context).size.width;
     final boardSize = (screenWidth - 32).clamp(280.0, 480.0);
 
     return Scaffold(
-      backgroundColor: SparkTheme.background,
+      backgroundColor: theme.background,
       body: SafeArea(
-        // GestureDetector가 Stack 전체를 감싸야 버튼 위에서도 스와이프가 누락되지 않음
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onPanStart: (d) {
             _panStart = d.localPosition;
             _panCurrent = d.localPosition;
           },
-          onPanUpdate: (d) {
-            _panCurrent = d.localPosition;
-          },
+          onPanUpdate: (d) => _panCurrent = d.localPosition,
           onPanEnd: (d) {
             final start = _panStart;
             if (start == null) return;
@@ -139,13 +123,10 @@ class _GameScreenState extends State<GameScreen> {
 
             final delta = _panCurrent - start;
             final vel = d.velocity.pixelsPerSecond;
-
-            // 델타가 작을 경우 속도로 보완 (빠른 플릭 누락 방지)
             final dx = delta.dx.abs() > 6 ? delta.dx : vel.dx / 22;
             final dy = delta.dy.abs() > 6 ? delta.dy : vel.dy / 22;
 
             if (dx.abs() < _minSwipeDist && dy.abs() < _minSwipeDist) return;
-
             if (dx.abs() > dy.abs()) {
               _onSwipe(dx > 0 ? SwipeDirection.right : SwipeDirection.left);
             } else {
@@ -154,17 +135,14 @@ class _GameScreenState extends State<GameScreen> {
           },
           child: Stack(
             children: [
-              _buildMainContent(boardSize),
+              _buildMainContent(boardSize, theme),
               if (_state.status == GameStatus.won)
                 SparkIgnitedOverlay(
                   onContinue: _continueGame,
                   onRestart: _restart,
                 ),
               if (_state.status == GameStatus.over)
-                GameOverOverlay(
-                  score: _state.score,
-                  onRestart: _restart,
-                ),
+                GameOverOverlay(score: _state.score, onRestart: _restart),
             ],
           ),
         ),
@@ -172,20 +150,17 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
-  Widget _buildMainContent(double boardSize) {
+  Widget _buildMainContent(double boardSize, AppTheme theme) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         children: [
           const SizedBox(height: 16),
-          _buildHeader(),
+          _buildHeader(theme),
           const SizedBox(height: 18),
-          ScoreBoard(
-            score: _state.score,
-            bestScore: _state.bestScore,
-          ),
+          ScoreBoard(score: _state.score, bestScore: _state.bestScore),
           const SizedBox(height: 18),
-          _buildHint(),
+          _buildHint(theme),
           const SizedBox(height: 14),
           GameBoard(state: _state, size: boardSize),
         ],
@@ -193,8 +168,7 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
-  /// 헤더: [⚡ 로고 + 타이틀] ........... [↺ NEW GAME]
-  Widget _buildHeader() {
+  Widget _buildHeader(AppTheme theme) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -203,20 +177,20 @@ class _GameScreenState extends State<GameScreen> {
           width: 34,
           height: 34,
           decoration: BoxDecoration(
-            color: SparkTheme.neonBlue.withValues(alpha: 0.15),
+            color: theme.accent.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(7),
             border: Border.all(
-              color: SparkTheme.neonBlue.withValues(alpha: 0.5),
+              color: theme.accent.withValues(alpha: 0.5),
               width: 1,
             ),
             boxShadow: [
               BoxShadow(
-                color: SparkTheme.neonBlue.withValues(alpha: 0.3),
+                color: theme.accent.withValues(alpha: 0.3),
                 blurRadius: 10,
               ),
             ],
           ),
-          child: const Icon(Icons.bolt, color: SparkTheme.neonBlue, size: 20),
+          child: Icon(theme.logoIcon, color: theme.accent, size: 20),
         ),
         const SizedBox(width: 8),
         // 타이틀
@@ -229,33 +203,33 @@ class _GameScreenState extends State<GameScreen> {
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w900,
-                    color: SparkTheme.neonBlue,
+                    color: theme.accent,
                     letterSpacing: 0.3,
                     shadows: [
                       Shadow(
-                        color: SparkTheme.neonBlue.withValues(alpha: 0.6),
+                        color: theme.accent.withValues(alpha: 0.6),
                         blurRadius: 10,
                       ),
                     ],
                   ),
                 ),
-                const TextSpan(
+                TextSpan(
                   text: ':2048 ',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
-                    color: SparkTheme.textPrimary,
+                    color: theme.textPrimary,
                   ),
                 ),
                 TextSpan(
-                  text: 'Spark',
+                  text: theme.logoLabel,
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w900,
-                    color: SparkTheme.neonGold,
+                    color: theme.accentWarm,
                     shadows: [
                       Shadow(
-                        color: SparkTheme.neonGold.withValues(alpha: 0.6),
+                        color: theme.accentWarm.withValues(alpha: 0.6),
                         blurRadius: 8,
                       ),
                     ],
@@ -273,27 +247,48 @@ class _GameScreenState extends State<GameScreen> {
             _audio.toggleMute();
           }),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 6),
+        // 테마 선택 버튼
+        _ThemeButton(
+          onTap: () => _showThemeSelector(context),
+        ),
+        const SizedBox(width: 6),
         // NEW GAME 버튼
         _NewGameButton(onTap: _restart),
       ],
     );
   }
 
-  Widget _buildHint() {
+  Widget _buildHint(AppTheme theme) {
     return Text(
-      'SWIPE TO MERGE  •  REACH 2048',
+      theme.hintText,
       style: TextStyle(
         fontSize: 10,
-        color: SparkTheme.textMuted,
+        color: theme.textMuted,
         letterSpacing: 2.5,
         fontWeight: FontWeight.w600,
       ),
     );
   }
+
+  void _showThemeSelector(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: false,
+      builder: (_) => _ThemeSelector(
+        onThemeSelected: (theme) {
+          ThemeScope.notifierOf(context).setTheme(theme);
+          _audio.setProfile(theme.soundProfile);
+          Navigator.pop(context);
+        },
+      ),
+    );
+  }
 }
 
-/// 음소거 토글 버튼
+// ─── 음소거 버튼 ──────────────────────────────────────────────────────────────
+
 class _MuteButton extends StatelessWidget {
   final bool muted;
   final VoidCallback onTap;
@@ -301,27 +296,25 @@ class _MuteButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = muted ? SparkTheme.textMuted : SparkTheme.neonBlue;
+    final theme = ThemeScope.of(context);
+    final color = muted ? theme.textMuted : theme.accent;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        width: 40,
-        height: 40,
+        width: 36,
+        height: 36,
         decoration: BoxDecoration(
           color: muted
-              ? SparkTheme.surface
-              : SparkTheme.neonBlue.withValues(alpha: 0.1),
+              ? theme.surface
+              : theme.accent.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: color.withValues(alpha: 0.5),
-            width: 1,
-          ),
+          border: Border.all(color: color.withValues(alpha: 0.5), width: 1),
           boxShadow: muted
               ? []
               : [
                   BoxShadow(
-                    color: SparkTheme.neonBlue.withValues(alpha: 0.15),
+                    color: theme.accent.withValues(alpha: 0.15),
                     blurRadius: 10,
                   ),
                 ],
@@ -329,14 +322,49 @@ class _MuteButton extends StatelessWidget {
         child: Icon(
           muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
           color: color,
-          size: 20,
+          size: 18,
         ),
       ),
     );
   }
 }
 
-/// 헤더 오른쪽의 NEW GAME 버튼
+// ─── 테마 선택 버튼 ───────────────────────────────────────────────────────────
+
+class _ThemeButton extends StatelessWidget {
+  final VoidCallback onTap;
+  const _ThemeButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = ThemeScope.of(context);
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: theme.accentPop.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: theme.accentPop.withValues(alpha: 0.5),
+            width: 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: theme.accentPop.withValues(alpha: 0.15),
+              blurRadius: 10,
+            ),
+          ],
+        ),
+        child: Icon(Icons.palette_outlined, color: theme.accentPop, size: 18),
+      ),
+    );
+  }
+}
+
+// ─── NEW GAME 버튼 ────────────────────────────────────────────────────────────
+
 class _NewGameButton extends StatefulWidget {
   final VoidCallback onTap;
   const _NewGameButton({required this.onTap});
@@ -372,6 +400,7 @@ class _NewGameButtonState extends State<_NewGameButton>
 
   @override
   Widget build(BuildContext context) {
+    final theme = ThemeScope.of(context);
     return GestureDetector(
       onTapDown: (_) => setState(() => _pressed = true),
       onTapUp: (_) {
@@ -381,39 +410,213 @@ class _NewGameButtonState extends State<_NewGameButton>
       onTapCancel: () => setState(() => _pressed = false),
       child: AnimatedBuilder(
         animation: _ctrl,
-        builder: (_, child) {
-          final spin = _ctrl.value * 2 * 3.14159;
-          return Transform.rotate(
-            angle: spin,
-            child: child,
-          );
-        },
+        builder: (_, child) => Transform.rotate(
+          angle: _ctrl.value * 2 * 3.14159,
+          child: child,
+        ),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 80),
-          width: 40,
-          height: 40,
+          width: 36,
+          height: 36,
           decoration: BoxDecoration(
             color: _pressed
-                ? SparkTheme.neonBlue.withValues(alpha: 0.25)
-                : SparkTheme.neonBlue.withValues(alpha: 0.1),
+                ? theme.accent.withValues(alpha: 0.25)
+                : theme.accent.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: SparkTheme.neonBlue.withValues(alpha: 0.5),
+              color: theme.accent.withValues(alpha: 0.5),
               width: 1,
             ),
             boxShadow: [
               BoxShadow(
-                color: SparkTheme.neonBlue
-                    .withValues(alpha: _pressed ? 0.4 : 0.15),
+                color: theme.accent.withValues(alpha: _pressed ? 0.4 : 0.15),
                 blurRadius: 10,
               ),
             ],
           ),
-          child: const Icon(
-            Icons.refresh_rounded,
-            color: SparkTheme.neonBlue,
-            size: 20,
+          child: Icon(Icons.refresh_rounded, color: theme.accent, size: 18),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── 테마 선택 바텀 시트 ──────────────────────────────────────────────────────
+
+class _ThemeSelector extends StatelessWidget {
+  final void Function(AppTheme) onThemeSelected;
+  const _ThemeSelector({required this.onThemeSelected});
+
+  @override
+  Widget build(BuildContext context) {
+    final current = ThemeScope.of(context);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: current.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        border: Border.all(
+          color: current.accent.withValues(alpha: 0.2),
+          width: 1,
+        ),
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 드래그 핸들
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: current.textMuted.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
           ),
+          const SizedBox(height: 16),
+          Text(
+            'Choose Theme',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: current.textPrimary,
+              letterSpacing: 1.5,
+            ),
+          ),
+          const SizedBox(height: 16),
+          ...AppTheme.all.map((theme) => _ThemeCard(
+                theme: theme,
+                isSelected: theme.id == current.id,
+                onTap: () => onThemeSelected(theme),
+              )),
+        ],
+      ),
+    );
+  }
+}
+
+class _ThemeCard extends StatelessWidget {
+  final AppTheme theme;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _ThemeCard({
+    required this.theme,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final current = ThemeScope.of(context);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? theme.accent.withValues(alpha: 0.15)
+              : current.background.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected
+                ? theme.accent
+                : current.textMuted.withValues(alpha: 0.2),
+            width: isSelected ? 1.5 : 1,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: theme.accent.withValues(alpha: 0.2),
+                    blurRadius: 12,
+                  )
+                ]
+              : [],
+        ),
+        child: Row(
+          children: [
+            // 이모지
+            Text(
+              theme.emoji,
+              style: const TextStyle(fontSize: 24),
+            ),
+            const SizedBox(width: 12),
+            // 이름 + 설명
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    theme.displayName,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: isSelected ? theme.accent : current.textPrimary,
+                    ),
+                  ),
+                  Text(
+                    theme.subtitle,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: current.textMuted,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // 색상 스와치
+            Row(
+              children: [
+                theme.accent,
+                theme.accentAlt,
+                theme.accentPop,
+                theme.accentWarm,
+              ]
+                  .map((c) => Container(
+                        width: 12,
+                        height: 12,
+                        margin: const EdgeInsets.only(left: 4),
+                        decoration: BoxDecoration(
+                          color: c,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: c.withValues(alpha: 0.4),
+                              blurRadius: 4,
+                            )
+                          ],
+                        ),
+                      ))
+                  .toList(),
+            ),
+            const SizedBox(width: 10),
+            // 선택 표시
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isSelected ? theme.accent : Colors.transparent,
+                border: Border.all(
+                  color: isSelected
+                      ? theme.accent
+                      : current.textMuted.withValues(alpha: 0.3),
+                  width: 1.5,
+                ),
+              ),
+              child: isSelected
+                  ? const Icon(Icons.check, size: 12, color: Colors.white)
+                  : null,
+            ),
+          ],
         ),
       ),
     );

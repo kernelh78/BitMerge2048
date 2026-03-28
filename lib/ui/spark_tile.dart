@@ -1,5 +1,7 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
-import '../theme/spark_theme.dart';
+import '../theme/app_theme.dart';
+import '../theme/theme_notifier.dart';
 
 class SparkTile extends StatefulWidget {
   final int value;
@@ -21,53 +23,63 @@ class _SparkTileState extends State<SparkTile>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnim;
+  bool _animSetup = false;
 
   @override
   void initState() {
     super.initState();
+    // 컨트롤러는 여기서, 실제 애니메이션 파라미터는 didChangeDependencies에서
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 180),
+    );
+    _scaleAnim = ConstantTween<double>(1.0).animate(_controller);
+  }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_animSetup) {
+      _animSetup = true;
+      final theme = ThemeScope.of(context);
+      _setupInitialAnim(theme);
+      _controller.forward();
+    }
+  }
+
+  void _setupInitialAnim(AppTheme theme) {
     if (widget.isNew) {
-      _controller = AnimationController(
-        vsync: this,
-        duration: const Duration(milliseconds: 220),
-      );
+      _controller.duration = theme.spawnDuration;
       _scaleAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
-        CurvedAnimation(parent: _controller, curve: Curves.elasticOut),
+        CurvedAnimation(parent: _controller, curve: theme.spawnCurve),
       );
     } else if (widget.isMerged) {
-      _controller = AnimationController(
-        vsync: this,
-        duration: const Duration(milliseconds: 260),
-      );
-      // 강렬한 팝: 크게 튀었다가 단단하게 눌렸다 빠르게 안정
-      _scaleAnim = TweenSequence<double>([
-        TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.65), weight: 22),
-        TweenSequenceItem(tween: Tween(begin: 1.65, end: 0.82), weight: 28),
-        TweenSequenceItem(tween: Tween(begin: 0.82, end: 1.10), weight: 28),
-        TweenSequenceItem(tween: Tween(begin: 1.10, end: 1.0), weight: 22),
-      ]).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+      _controller.duration = theme.mergeDuration;
+      _scaleAnim = _buildMergeAnim(
+          theme.mergeScalePeak, theme.mergeScaleDip, theme.mergeScaleBounce);
     } else {
-      _controller = AnimationController(
-        vsync: this,
-        duration: const Duration(milliseconds: 180),
-      );
+      _controller.duration = const Duration(milliseconds: 1);
       _scaleAnim = ConstantTween<double>(1.0).animate(_controller);
     }
+  }
 
-    _controller.forward();
+  Animation<double> _buildMergeAnim(double peak, double dip, double bounce) {
+    return TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: peak), weight: 22),
+      TweenSequenceItem(tween: Tween(begin: peak, end: dip), weight: 28),
+      TweenSequenceItem(tween: Tween(begin: dip, end: bounce), weight: 28),
+      TweenSequenceItem(tween: Tween(begin: bounce, end: 1.0), weight: 22),
+    ]).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
   }
 
   @override
   void didUpdateWidget(SparkTile old) {
     super.didUpdateWidget(old);
     if (widget.isMerged && !old.isMerged) {
-      _controller.duration = const Duration(milliseconds: 300);
-      _scaleAnim = TweenSequence<double>([
-        TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.45), weight: 30),
-        TweenSequenceItem(tween: Tween(begin: 1.45, end: 0.88), weight: 30),
-        TweenSequenceItem(tween: Tween(begin: 0.88, end: 1.04), weight: 20),
-        TweenSequenceItem(tween: Tween(begin: 1.04, end: 1.0), weight: 20),
-      ]).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+      final theme = ThemeScope.of(context);
+      _controller.duration = theme.mergeDuration;
+      _scaleAnim = _buildMergeAnim(
+          theme.mergeScalePeak, theme.mergeScaleDip, theme.mergeScaleBounce);
       _controller.forward(from: 0);
     }
   }
@@ -80,27 +92,28 @@ class _SparkTileState extends State<SparkTile>
 
   @override
   Widget build(BuildContext context) {
+    final theme = ThemeScope.of(context);
     return AnimatedBuilder(
       animation: _controller,
-      builder: (context, child) {
-        return Transform.scale(
-          scale: _scaleAnim.value,
-          child: child,
-        );
-      },
-      child: _buildTile(),
+      builder: (context, child) => Transform.scale(
+        scale: _scaleAnim.value,
+        child: child,
+      ),
+      child: _buildTile(theme),
     );
   }
 
-  Widget _buildTile() {
-    final glowColor = SparkTheme.tileGlow(widget.value);
-    final borderColor = SparkTheme.tileBorder(widget.value);
+  Widget _buildTile(AppTheme theme) {
+    final glowColor = theme.tileGlow(widget.value);
+    final borderColor = theme.tileBorder(widget.value);
+    final gradient = theme.tileGradient(widget.value);
 
     return Container(
-      margin: const EdgeInsets.all(3),
+      margin: EdgeInsets.all(theme.tileMargin),
       decoration: BoxDecoration(
-        color: SparkTheme.tileColor(widget.value),
-        borderRadius: BorderRadius.circular(6),
+        color: gradient == null ? theme.tileColor(widget.value) : null,
+        gradient: gradient,
+        borderRadius: BorderRadius.circular(theme.tileRadius),
         border: Border.all(color: borderColor, width: 1.2),
         boxShadow: [
           BoxShadow(
@@ -112,18 +125,18 @@ class _SparkTileState extends State<SparkTile>
       ),
       child: Stack(
         children: [
-          _CircuitOverlay(value: widget.value),
+          _buildOverlay(theme),
           Center(
             child: Text(
               widget.value.toString(),
               style: TextStyle(
-                fontSize: SparkTheme.tileFontSize(widget.value),
+                fontSize: theme.tileFontSize(widget.value),
                 fontWeight: FontWeight.w800,
-                color: SparkTheme.tileTextColor(widget.value),
+                color: theme.tileTextColor(widget.value),
                 letterSpacing: -0.5,
                 shadows: [
                   Shadow(
-                    color: SparkTheme.tileGlow(widget.value),
+                    color: theme.tileGlow(widget.value),
                     blurRadius: widget.value >= 64 ? 12 : 6,
                   ),
                 ],
@@ -134,26 +147,34 @@ class _SparkTileState extends State<SparkTile>
       ),
     );
   }
-}
 
-/// 회로기판 패턴 오버레이
-class _CircuitOverlay extends StatelessWidget {
-  final int value;
-
-  const _CircuitOverlay({required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Positioned.fill(
-      child: CustomPaint(
-        painter: _CircuitPainter(
-          color: SparkTheme.tileBorder(value).withValues(alpha: 0.15),
-          seed: value,
-        ),
-      ),
-    );
+  Widget _buildOverlay(AppTheme theme) {
+    final color =
+        theme.tileBorder(widget.value).withValues(alpha: theme.tileOverlayAlpha);
+    switch (theme.tileOverlayStyle) {
+      case TileOverlayStyle.circuit:
+        return Positioned.fill(
+          child: CustomPaint(
+            painter: _CircuitPainter(color: color, seed: widget.value),
+          ),
+        );
+      case TileOverlayStyle.floral:
+        return Positioned.fill(
+          child: CustomPaint(
+            painter: _FloralPainter(color: color, seed: widget.value),
+          ),
+        );
+      case TileOverlayStyle.dots:
+        return Positioned.fill(
+          child: CustomPaint(
+            painter: _DotsPainter(color: color, seed: widget.value),
+          ),
+        );
+    }
   }
 }
+
+// ─── Neon Circuit: 회로기판 패턴 ─────────────────────────────────────────────
 
 class _CircuitPainter extends CustomPainter {
   final Color color;
@@ -168,43 +189,131 @@ class _CircuitPainter extends CustomPainter {
       ..strokeWidth = 0.8
       ..style = PaintingStyle.stroke;
 
-    // 회로 라인 패턴 (seed 기반으로 타일마다 다른 느낌)
-    final w = size.width;
-    final h = size.height;
-
-    // 코너 도트
     final dotPaint = Paint()
       ..color = color
       ..style = PaintingStyle.fill;
+
+    final w = size.width;
+    final h = size.height;
     const r = 2.0;
+
     canvas.drawCircle(Offset(r + 4, r + 4), r, dotPaint);
     canvas.drawCircle(Offset(w - r - 4, r + 4), r, dotPaint);
     canvas.drawCircle(Offset(r + 4, h - r - 4), r, dotPaint);
     canvas.drawCircle(Offset(w - r - 4, h - r - 4), r, dotPaint);
 
-    // 수평/수직 라인
     if (seed >= 8) {
       canvas.drawLine(Offset(r + 4, r + 4), Offset(w * 0.35, r + 4), paint);
       canvas.drawLine(
           Offset(w - r - 4, r + 4), Offset(w * 0.65, r + 4), paint);
-      canvas.drawLine(Offset(r + 4, h - r - 4),
-          Offset(w * 0.35, h - r - 4), paint);
+      canvas.drawLine(
+          Offset(r + 4, h - r - 4), Offset(w * 0.35, h - r - 4), paint);
     }
-
     if (seed >= 32) {
       canvas.drawLine(Offset(r + 4, r + 4), Offset(r + 4, h * 0.3), paint);
       canvas.drawLine(
           Offset(w - r - 4, r + 4), Offset(w - r - 4, h * 0.3), paint);
     }
-
     if (seed >= 128) {
-      // 중앙 십자 패턴
-      canvas.drawLine(Offset(w * 0.5, h * 0.1), Offset(w * 0.5, h * 0.35), paint);
-      canvas.drawLine(Offset(w * 0.1, h * 0.5), Offset(w * 0.35, h * 0.5), paint);
-      canvas.drawLine(Offset(w * 0.65, h * 0.5), Offset(w * 0.9, h * 0.5), paint);
+      canvas.drawLine(
+          Offset(w * 0.5, h * 0.1), Offset(w * 0.5, h * 0.35), paint);
+      canvas.drawLine(
+          Offset(w * 0.1, h * 0.5), Offset(w * 0.35, h * 0.5), paint);
+      canvas.drawLine(
+          Offset(w * 0.65, h * 0.5), Offset(w * 0.9, h * 0.5), paint);
     }
   }
 
   @override
   bool shouldRepaint(_CircuitPainter old) => old.seed != seed;
+}
+
+// ─── Cherry Bloom: 꽃잎 패턴 ─────────────────────────────────────────────────
+
+class _FloralPainter extends CustomPainter {
+  final Color color;
+  final int seed;
+
+  _FloralPainter({required this.color, required this.seed});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    final w = size.width;
+    final h = size.height;
+    const r = 2.5;
+
+    void drawPetal(Offset center) {
+      canvas.drawCircle(center, r, paint);
+      if (seed >= 8) {
+        canvas.drawCircle(center + const Offset(5, 0), r * 0.7, paint);
+        canvas.drawCircle(center + const Offset(0, 5), r * 0.7, paint);
+      }
+    }
+
+    drawPetal(Offset(r + 5, r + 5));
+    drawPetal(Offset(w - r - 5, r + 5));
+    drawPetal(Offset(r + 5, h - r - 5));
+    drawPetal(Offset(w - r - 5, h - r - 5));
+
+    if (seed >= 64) {
+      final strokePaint = Paint()
+        ..color = color
+        ..strokeWidth = 0.9
+        ..style = PaintingStyle.stroke;
+      canvas.drawCircle(Offset(w / 2, h / 2), w * 0.18, strokePaint);
+    }
+    if (seed >= 256) {
+      for (int i = 0; i < 6; i++) {
+        final angle = i * pi / 3;
+        final cx = w / 2 + cos(angle) * w * 0.22;
+        final cy = h / 2 + sin(angle) * h * 0.22;
+        canvas.drawCircle(Offset(cx, cy), r * 0.8, paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_FloralPainter old) => old.seed != seed;
+}
+
+// ─── Pastel Dream: 소프트 도트 패턴 ──────────────────────────────────────────
+
+class _DotsPainter extends CustomPainter {
+  final Color color;
+  final int seed;
+
+  _DotsPainter({required this.color, required this.seed});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    final w = size.width;
+    final h = size.height;
+    final rng = Random(seed);
+
+    final count = seed >= 512
+        ? 8
+        : seed >= 64
+            ? 5
+            : seed >= 8
+                ? 3
+                : 2;
+
+    for (int i = 0; i < count; i++) {
+      final x = 6 + rng.nextDouble() * (w - 12);
+      final y = 6 + rng.nextDouble() * (h - 12);
+      final r = 1.5 + rng.nextDouble() * 2.0;
+      canvas.drawCircle(Offset(x, y), r, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DotsPainter old) => old.seed != seed;
 }

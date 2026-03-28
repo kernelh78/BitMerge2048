@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../theme/spark_theme.dart';
+import '../theme/theme_notifier.dart';
 
 class ScoreBoard extends StatefulWidget {
   final int score;
@@ -47,19 +47,21 @@ class _ScoreBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = ThemeScope.of(context);
+
     return Container(
       width: 120,
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
       decoration: BoxDecoration(
-        color: SparkTheme.surface,
+        color: theme.surface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: SparkTheme.neonBlue.withValues(alpha: 0.25),
+          color: theme.accent.withValues(alpha: 0.25),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: SparkTheme.neonBlue.withValues(alpha: 0.06),
+            color: theme.accent.withValues(alpha: 0.06),
             blurRadius: 12,
           ),
         ],
@@ -75,7 +77,7 @@ class _ScoreBox extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: SparkTheme.textMuted,
+                  color: theme.textMuted,
                   letterSpacing: 2,
                 ),
               ),
@@ -88,10 +90,10 @@ class _ScoreBox extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w800,
-                    color: SparkTheme.neonBlue,
+                    color: theme.accent,
                     shadows: [
                       Shadow(
-                        color: SparkTheme.neonBlue.withValues(alpha: 0.6),
+                        color: theme.accent.withValues(alpha: 0.6),
                         blurRadius: 8,
                       ),
                     ],
@@ -147,6 +149,7 @@ class _FloatingDeltaState extends State<_FloatingDelta>
 
   @override
   Widget build(BuildContext context) {
+    final theme = ThemeScope.of(context);
     return AnimatedBuilder(
       animation: _ctrl,
       builder: (ctx, child) => Transform.translate(
@@ -158,9 +161,9 @@ class _FloatingDeltaState extends State<_FloatingDelta>
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w700,
-              color: SparkTheme.neonCyan,
+              color: theme.accentAlt,
               shadows: [
-                Shadow(color: SparkTheme.neonCyan, blurRadius: 6),
+                Shadow(color: theme.accentAlt, blurRadius: 6),
               ],
             ),
           ),

@@ -1,6 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
-import '../theme/spark_theme.dart';
+import '../theme/theme_notifier.dart';
 
 class SparkIgnitedOverlay extends StatefulWidget {
   final VoidCallback onContinue;
@@ -46,12 +46,13 @@ class _SparkIgnitedOverlayState extends State<SparkIgnitedOverlay>
 
   @override
   Widget build(BuildContext context) {
+    final theme = ThemeScope.of(context);
+
     return Container(
       color: Colors.black.withValues(alpha: 0.82),
       child: Stack(
         children: [
-          // 파티클 효과
-          const _ParticleField(),
+          _ParticleField(colors: theme.particleColors),
           Center(
             child: AnimatedBuilder(
               animation: _ctrl,
@@ -65,20 +66,22 @@ class _SparkIgnitedOverlayState extends State<SparkIgnitedOverlay>
                   AnimatedBuilder(
                     animation: _glow,
                     builder: (ctx, child) => Text(
-                      '⚡ Spark Ignited! ⚡',
+                      theme.winTitle,
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 32,
+                        fontSize: 30,
                         fontWeight: FontWeight.w900,
-                        color: SparkTheme.neonGold,
+                        color: theme.accentWarm,
                         letterSpacing: 1.5,
                         shadows: [
                           Shadow(
-                            color: SparkTheme.neonGold.withValues(alpha: _glow.value),
+                            color: theme.accentWarm
+                                .withValues(alpha: _glow.value),
                             blurRadius: 30 * _glow.value,
                           ),
                           Shadow(
-                            color: SparkTheme.neonPurple.withValues(alpha: _glow.value * 0.6),
+                            color: theme.accentPop
+                                .withValues(alpha: _glow.value * 0.6),
                             blurRadius: 50 * _glow.value,
                           ),
                         ],
@@ -87,10 +90,10 @@ class _SparkIgnitedOverlayState extends State<SparkIgnitedOverlay>
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'You reached 2048!',
+                    theme.winSubtitle,
                     style: TextStyle(
                       fontSize: 16,
-                      color: SparkTheme.textMuted,
+                      color: theme.textMuted,
                       letterSpacing: 1.2,
                     ),
                   ),
@@ -99,14 +102,14 @@ class _SparkIgnitedOverlayState extends State<SparkIgnitedOverlay>
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       _OverlayButton(
-                        label: 'KEEP GOING',
-                        color: SparkTheme.neonBlue,
+                        label: theme.continueLabel,
+                        color: theme.accent,
                         onTap: widget.onContinue,
                       ),
                       const SizedBox(width: 16),
                       _OverlayButton(
-                        label: 'NEW GAME',
-                        color: SparkTheme.neonPurple,
+                        label: theme.newGameLabel,
+                        color: theme.accentPop,
                         onTap: widget.onRestart,
                       ),
                     ],
@@ -133,6 +136,8 @@ class GameOverOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = ThemeScope.of(context);
+
     return Container(
       color: Colors.black.withValues(alpha: 0.78),
       child: Center(
@@ -140,14 +145,14 @@ class GameOverOverlay extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'SYSTEM HALT',
+              theme.gameOverTitle,
               style: TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.w900,
-                color: SparkTheme.neonPink,
+                color: theme.accentAlt,
                 letterSpacing: 3,
                 shadows: [
-                  Shadow(color: SparkTheme.neonPink, blurRadius: 20),
+                  Shadow(color: theme.accentAlt, blurRadius: 20),
                 ],
               ),
             ),
@@ -156,7 +161,7 @@ class GameOverOverlay extends StatelessWidget {
               'No moves remaining',
               style: TextStyle(
                 fontSize: 14,
-                color: SparkTheme.textMuted,
+                color: theme.textMuted,
                 letterSpacing: 1.5,
               ),
             ),
@@ -166,13 +171,13 @@ class GameOverOverlay extends StatelessWidget {
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w700,
-                color: SparkTheme.neonCyan,
+                color: theme.accentPop,
               ),
             ),
             const SizedBox(height: 32),
             _OverlayButton(
-              label: 'REBOOT',
-              color: SparkTheme.neonPink,
+              label: theme.restartLabel,
+              color: theme.accent,
               onTap: onRestart,
             ),
           ],
@@ -221,9 +226,11 @@ class _OverlayButton extends StatelessWidget {
   }
 }
 
-// 파티클 이펙트
+// ─── 파티클 이펙트 (테마별 색상) ──────────────────────────────────────────────
+
 class _ParticleField extends StatefulWidget {
-  const _ParticleField();
+  final List<Color> colors;
+  const _ParticleField({required this.colors});
 
   @override
   State<_ParticleField> createState() => _ParticleFieldState();
@@ -232,19 +239,32 @@ class _ParticleField extends StatefulWidget {
 class _ParticleFieldState extends State<_ParticleField>
     with SingleTickerProviderStateMixin {
   late AnimationController _ctrl;
-  final List<_Particle> _particles = [];
+  late List<_Particle> _particles;
 
   @override
   void initState() {
     super.initState();
-    final rng = Random();
-    for (int i = 0; i < 40; i++) {
-      _particles.add(_Particle(rng));
-    }
+    _rebuildParticles();
     _ctrl = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 3),
     )..repeat();
+  }
+
+  void _rebuildParticles() {
+    final rng = Random();
+    _particles = List.generate(
+      40,
+      (_) => _Particle(rng, widget.colors),
+    );
+  }
+
+  @override
+  void didUpdateWidget(_ParticleField old) {
+    super.didUpdateWidget(old);
+    if (old.colors != widget.colors) {
+      _rebuildParticles();
+    }
   }
 
   @override
@@ -258,10 +278,7 @@ class _ParticleFieldState extends State<_ParticleField>
     return AnimatedBuilder(
       animation: _ctrl,
       builder: (ctx, child) => CustomPaint(
-        painter: _ParticlePainter(
-          particles: _particles,
-          t: _ctrl.value,
-        ),
+        painter: _ParticlePainter(particles: _particles, t: _ctrl.value),
         child: const SizedBox.expand(),
       ),
     );
@@ -276,18 +293,13 @@ class _Particle {
   final Color color;
   final double phase;
 
-  _Particle(Random rng)
+  _Particle(Random rng, List<Color> colors)
       : x = rng.nextDouble(),
         y = rng.nextDouble(),
         speed = 0.1 + rng.nextDouble() * 0.3,
         size = 1 + rng.nextDouble() * 3,
         phase = rng.nextDouble(),
-        color = [
-          SparkTheme.neonGold,
-          SparkTheme.neonBlue,
-          SparkTheme.neonPurple,
-          SparkTheme.neonCyan,
-        ][rng.nextInt(4)];
+        color = colors[rng.nextInt(colors.length)];
 }
 
 class _ParticlePainter extends CustomPainter {

@@ -1,19 +1,7 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 import '../game/game_state.dart';
-import '../theme/spark_theme.dart';
+import '../theme/theme_notifier.dart';
 import 'spark_tile.dart';
-
-/// 지수 감속 커브: 타일이 빠르게 출발해 정확하게 멈추는 느낌
-class _ExpoOut extends Curve {
-  const _ExpoOut();
-  @override
-  double transformInternal(double t) {
-    if (t == 1.0) return 1.0;
-    return 1 - pow(2, -10 * t).toDouble();
-  }
-}
 
 class GameBoard extends StatelessWidget {
   final GameState state;
@@ -23,22 +11,23 @@ class GameBoard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cellSize = (size - 16) / 4; // 16 = 패딩
+    final theme = ThemeScope.of(context);
+    final cellSize = (size - 16) / 4;
 
     return Container(
       width: size,
       height: size,
       padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
-        color: SparkTheme.boardBg,
-        borderRadius: BorderRadius.circular(10),
+        color: theme.boardBg,
+        borderRadius: BorderRadius.circular(theme.boardRadius),
         border: Border.all(
-          color: SparkTheme.neonBlue.withValues(alpha: 0.2),
+          color: theme.accent.withValues(alpha: 0.2),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: SparkTheme.neonBlue.withValues(alpha: 0.08),
+            color: theme.accent.withValues(alpha: theme.isDark ? 0.08 : 0.12),
             blurRadius: 24,
             spreadRadius: 4,
           ),
@@ -46,31 +35,27 @@ class GameBoard extends StatelessWidget {
       ),
       child: Stack(
         children: [
-          // 빈 셀 배경
-          _buildEmptyCells(cellSize),
-          // 실제 타일
-          ..._buildTiles(cellSize),
+          _buildEmptyCells(theme),
+          ..._buildTiles(cellSize, theme),
         ],
       ),
     );
   }
 
-  Widget _buildEmptyCells(double cellSize) {
+  Widget _buildEmptyCells(theme) {
     return GridView.builder(
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 4,
-        mainAxisSpacing: 0,
-        crossAxisSpacing: 0,
       ),
       itemCount: 16,
       itemBuilder: (context, index) => Container(
         margin: const EdgeInsets.all(3),
         decoration: BoxDecoration(
-          color: SparkTheme.cellBg,
-          borderRadius: BorderRadius.circular(4),
+          color: theme.cellBg,
+          borderRadius: BorderRadius.circular(theme.tileRadius - 2),
           border: Border.all(
-            color: SparkTheme.neonBlue.withValues(alpha: 0.06),
+            color: theme.accent.withValues(alpha: 0.06),
             width: 0.5,
           ),
         ),
@@ -78,15 +63,15 @@ class GameBoard extends StatelessWidget {
     );
   }
 
-  List<Widget> _buildTiles(double cellSize) {
+  List<Widget> _buildTiles(double cellSize, theme) {
     return state.tiles.map((tile) {
       final top = tile.row * cellSize + 6;
       final left = tile.col * cellSize + 6;
 
       return AnimatedPositioned(
-        key: ValueKey(tile.id), // ID 기반 키: 같은 타일이면 Flutter가 위치 변화를 감지해 애니메이션
-        duration: const Duration(milliseconds: 150),
-        curve: const _ExpoOut(),
+        key: ValueKey(tile.id),
+        duration: theme.slideDuration,
+        curve: theme.slideCurve,
         top: top,
         left: left,
         width: cellSize,
