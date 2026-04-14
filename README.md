@@ -1,23 +1,35 @@
-# bitmerge2048
+**2048**은 2014년 이탈리아의 개발자 가브리엘 칠룰리(Gabriele Cirulli)가 만든 중독성 강한 **싱글 플레이어 퍼즐 게임**입니다. 단순한 규칙에 비해 높은 전략성이 필요하여 전 세계적으로 큰 인기를 끌었습니다.
 
-A new Flutter project.
+---
 
-## Getting Started
+## 🎮 게임 방식
+게임은 4x4 그리드(격자) 위에서 진행됩니다.
 
-This project is a starting point for a Flutter application.
+1.  **조작:** 상, 하, 좌, 우 방향키(또는 스와이프)를 사용해 모든 타일을 한쪽 방향으로 밀어냅니다.
+2.  **합치기:** 같은 숫자가 적힌 두 타일이 부딪히면 **두 숫자의 합**이 적힌 하나의 타일로 합쳐집니다.
+    * 예: `2` + `2` = `4` / `1024` + `1024` = `2048`
+3.  **생성:** 타일을 움직일 때마다 빈 칸 중 한 곳에 `2` 또는 `4` 타일이 무작위로 생성됩니다.
+4.  **목표:** 타일들을 계속 합쳐서 최종적으로 **2048**이 적힌 타일을 만드는 것이 1차 목표입니다. (그 이후에도 계속 플레이하여 더 높은 점수를 노릴 수 있습니다.)
 
-A few resources to get you started if this is your first Flutter project:
+---
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+## 🏆 승리와 패배 조건
+* **승리:** 그리드 위에 숫자 **2048** 타일을 만들어내면 승리 팝업이 뜹니다.
+* **패배:** 그리드가 타일로 꽉 차서 더 이상 움직일 수 있는 공간이 없고, 합칠 수 있는 인접한 타일도 없을 때 게임이 종료됩니다.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+---
 
-3 mode updated, but normal mode reaction is good, but other is slow.
-I'll update 2 modes speed and change score calcuration method.
+## 💡 게임 팁 (공략법)
+무작정 타일을 움직이기보다는 아래와 같은 전략을 사용하면 2048에 도달하기 훨씬 쉽습니다.
 
+* **한쪽 구석 고수하기:** 가장 큰 숫자를 사각형의 **네 모서리 중 한 곳**에 고정시키는 것이 핵심입니다. (보통 왼쪽 아래나 오른쪽 아래를 선호합니다.)
+* **줄 세우기:** 큰 숫자부터 작은 숫자 순으로 계단식(Snake 형태)으로 정렬하면 타일을 합치기가 수월합니다.
+* **반대 방향 금지:** 만약 큰 숫자를 아래쪽에 모으고 있다면, **위쪽 방향키(↑)**는 가급적 누르지 않는 것이 좋습니다. 가장 큰 숫자가 구석에서 빠져나오면 빈자리에 작은 숫자(`2`나 `4`)가 생겨 흐름이 꼬일 수 있기 때문입니다.
 
-Update 3 thema
+---
+
+## 🛠️ 특징
+* **오픈 소스:** 이 게임은 오픈 소스로 공개되어 있어, 수많은 변형 버전(3D 버전, 8x8 버전, 숫자가 아닌 캐릭터 버전 등)이 존재합니다.
+* **수학적 재미:** 2의 거듭제곱($2^n$)을 기반으로 하기 때문에 숫자가 커지는 과정을 보는 재미가 있습니다.
+
+심심풀이로 시작했다가 몇 시간씩 집중하게 되는 마성의 게임이죠! 직접 해보시겠어요?
